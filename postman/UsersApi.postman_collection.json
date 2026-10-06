@@ -1,0 +1,282 @@
+{
+  "info": {
+    "name": "Users API",
+    "description": "Flujo repetible para la API de usuarios. Ejecutar en orden con el entorno Local.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Create user - 201",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const suffix = `${Date.now()}-${Math.floor(Math.random() * 1000000)}`;",
+                  "pm.environment.set('runSuffix', suffix);",
+                  "pm.environment.set('userName', `Postman User ${suffix}`);",
+                   "pm.environment.set('userEmail', `postman-${suffix}@example.test`);",
+                   "pm.environment.set('updatedUserName', `Updated User ${suffix}`);",
+                   "pm.environment.set('otherUserName', `Other User ${suffix}`);",
+                   "pm.environment.set('otherUserEmail', `other-postman-${suffix}@example.test`);",
+                  "pm.environment.set('skillName', `Postman Skill ${suffix}`);",
+                  "pm.environment.set('postTitle', `Post ${suffix}`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns 201 Created', function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.test('returns the created user without relations', function () { pm.expect(body).to.include({ name: pm.environment.get('userName'), email: pm.environment.get('userEmail') }); pm.expect(body.profile).to.eql(null); pm.expect(body.skills).to.eql([]); });",
+                  "pm.environment.set('userId', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"{{userName}}\",\n  \"email\": \"{{userEmail}}\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/users" }
+        },
+        {
+          "name": "Create second user - 201",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 201 Created', function () { pm.response.to.have.status(201); });", "const body = pm.response.json();", "pm.test('returns the second unique user', function () { pm.expect(body).to.include({ name: pm.environment.get('otherUserName'), email: pm.environment.get('otherUserEmail') }); });", "pm.environment.set('otherUserId', body.id);"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"{{otherUserName}}\",\n  \"email\": \"{{otherUserEmail}}\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/users" }
+        },
+        {
+          "name": "Create user - validation error 400",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 400 for a missing email', function () { pm.response.to.have.status(400); });", "pm.test('returns a validation error body', function () { pm.expect(pm.response.json().error).to.eql(\"'email' must be a non-empty string\"); });"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Missing email\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/users" }
+        },
+        {
+          "name": "Create user - duplicate email conflict 409",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 409 for a duplicate email', function () { pm.response.to.have.status(409); });", "pm.test('returns the duplicate-email error', function () { pm.expect(pm.response.json().error).to.eql('Email is already registered'); });"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Duplicate email\",\n  \"email\": \"{{userEmail}}\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/users" }
+        },
+        {
+          "name": "Get user - 200",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 200 OK', function () { pm.response.to.have.status(200); });", "pm.test('returns the requested user', function () { const body = pm.response.json(); pm.expect(body.id).to.eql(Number(pm.environment.get('userId'))); pm.expect(body.email).to.eql(pm.environment.get('userEmail')); });"] } }],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/users/{{userId}}" }
+        },
+        {
+          "name": "List users - 200",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 200 OK', function () { pm.response.to.have.status(200); });", "pm.test('includes the created user', function () { pm.expect(pm.response.json().some(function (user) { return user.id === Number(pm.environment.get('userId')); })).to.eql(true); });"] } }],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/users" }
+        },
+        {
+          "name": "Update user - 200",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 200 OK', function () { pm.response.to.have.status(200); });", "pm.test('updates only the supplied name', function () { const body = pm.response.json(); pm.expect(body.name).to.eql(pm.environment.get('updatedUserName')); pm.expect(body.email).to.eql(pm.environment.get('userEmail')); });"] } }],
+          "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"{{updatedUserName}}\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/users/{{userId}}" }
+        },
+        {
+          "name": "Update user - duplicate email conflict 409",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 409 for an email used by another user', function () { pm.response.to.have.status(409); });", "pm.test('returns the duplicate-email error', function () { pm.expect(pm.response.json().error).to.eql('Email is already registered'); });"] } }],
+          "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{otherUserEmail}}\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/users/{{userId}}" }
+        },
+        {
+          "name": "Update user - validation error 400",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 400 for an empty update', function () { pm.response.to.have.status(400); });", "pm.test('returns the update validation error', function () { pm.expect(pm.response.json().error).to.eql('At least one updatable field is required'); });"] } }],
+          "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/users/{{userId}}" }
+        },
+        {
+          "name": "Update missing user - 404",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 404 for an unknown user', function () { pm.response.to.have.status(404); });", "pm.test('returns the user-not-found error', function () { pm.expect(pm.response.json().error).to.eql('User not found'); });"] } }],
+          "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Unknown user\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/users/{{missingUserId}}" }
+        },
+        {
+          "name": "Upsert profile - validation error 400",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 400 for a missing bio', function () { pm.response.to.have.status(400); });", "pm.test('returns the profile validation error', function () { pm.expect(pm.response.json().error).to.eql(\"'bio' must be a non-empty string\"); });"] } }],
+          "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/users/{{userId}}/profile" }
+        },
+        {
+          "name": "Upsert profile for missing user - 404",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 404 for an unknown user', function () { pm.response.to.have.status(404); });", "pm.test('returns the user-not-found error', function () { pm.expect(pm.response.json().error).to.eql('User not found'); });"] } }],
+          "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"bio\": \"No user\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/users/{{missingUserId}}/profile" }
+        },
+        {
+          "name": "Upsert profile - create 200",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 200 OK', function () { pm.response.to.have.status(200); });", "pm.test('returns a profile linked to the user', function () { const body = pm.response.json(); pm.expect(body).to.include({ bio: 'Created by Postman', user_id: Number(pm.environment.get('userId')) }); pm.environment.set('profileId', body.id); });"] } }],
+          "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"bio\": \"Created by Postman\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/users/{{userId}}/profile" }
+        },
+        {
+          "name": "Upsert profile - update 200",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 200 OK', function () { pm.response.to.have.status(200); });", "pm.test('updates the existing profile', function () { const body = pm.response.json(); pm.expect(body).to.include({ id: Number(pm.environment.get('profileId')), bio: 'Updated by Postman' }); });"] } }],
+          "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"bio\": \"Updated by Postman\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/users/{{userId}}/profile" }
+        },
+        {
+          "name": "Delete missing user - 404",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 404 for an unknown user', function () { pm.response.to.have.status(404); });", "pm.test('returns the user-not-found error', function () { pm.expect(pm.response.json().error).to.eql('User not found'); });"] } }],
+          "request": { "method": "DELETE", "header": [], "url": "{{baseUrl}}/users/{{missingUserId}}" }
+        },
+        {
+          "name": "Get missing user - 404",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 404 for an unknown user', function () { pm.response.to.have.status(404); });", "pm.test('returns the user-not-found error', function () { pm.expect(pm.response.json().error).to.eql('User not found'); });"] } }],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/users/{{missingUserId}}" }
+        }
+      ]
+    },
+    {
+      "name": "Skills and user-skill relation",
+      "item": [
+        {
+          "name": "Create skill - 201",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 201 Created', function () { pm.response.to.have.status(201); });", "const body = pm.response.json();", "pm.test('returns the created skill', function () { pm.expect(body.name).to.eql(pm.environment.get('skillName')); });", "pm.environment.set('skillId', body.id);"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"{{skillName}}\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/skills" }
+        },
+        {
+          "name": "Create skill - validation error 400",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 400 for a blank name', function () { pm.response.to.have.status(400); });", "pm.test('returns a validation error body', function () { pm.expect(pm.response.json().error).to.eql(\"'name' must be a non-empty string\"); });"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/skills" }
+        },
+        {
+          "name": "Create skill - duplicate conflict 409",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 409 for a duplicate skill name', function () { pm.response.to.have.status(409); });", "pm.test('returns the duplicate-skill error', function () { pm.expect(pm.response.json().error).to.eql('Skill name already exists'); });"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"{{skillName}}\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/skills" }
+        },
+        {
+          "name": "Get skill - 200",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 200 OK', function () { pm.response.to.have.status(200); });", "pm.test('returns the requested skill', function () { const body = pm.response.json(); pm.expect(body).to.include({ id: Number(pm.environment.get('skillId')), name: pm.environment.get('skillName') }); });"] } }],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/skills/{{skillId}}" }
+        },
+        {
+          "name": "List skills - 200",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 200 OK', function () { pm.response.to.have.status(200); });", "pm.test('includes the created skill', function () { pm.expect(pm.response.json().some(function (skill) { return skill.id === Number(pm.environment.get('skillId')); })).to.eql(true); });"] } }],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/skills" }
+        },
+        {
+          "name": "Get missing skill - 404",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 404 for an unknown skill', function () { pm.response.to.have.status(404); });", "pm.test('returns the skill-not-found error', function () { pm.expect(pm.response.json().error).to.eql('Skill not found'); });"] } }],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/skills/{{missingSkillId}}" }
+        },
+        {
+          "name": "Assign skill to missing user - 404",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 404 for an unknown user', function () { pm.response.to.have.status(404); });", "pm.test('returns the user-not-found error', function () { pm.expect(pm.response.json().error).to.eql('User not found'); });"] } }],
+          "request": { "method": "POST", "header": [], "url": "{{baseUrl}}/users/{{missingUserId}}/skills/{{skillId}}" }
+        },
+        {
+          "name": "Assign missing skill to user - 404",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 404 for an unknown skill', function () { pm.response.to.have.status(404); });", "pm.test('returns the skill-not-found error', function () { pm.expect(pm.response.json().error).to.eql('Skill not found'); });"] } }],
+          "request": { "method": "POST", "header": [], "url": "{{baseUrl}}/users/{{userId}}/skills/{{missingSkillId}}" }
+        },
+        {
+          "name": "Assign skill to user - 200",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 200 OK', function () { pm.response.to.have.status(200); });", "pm.test('returns the user with the assigned skill', function () { const body = pm.response.json(); pm.expect(body.skills).to.deep.include({ id: Number(pm.environment.get('skillId')), name: pm.environment.get('skillName') }); });"] } }],
+          "request": { "method": "POST", "header": [], "url": "{{baseUrl}}/users/{{userId}}/skills/{{skillId}}" }
+        },
+        {
+          "name": "Assign skill twice - conflict 409",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 409 for an existing assignment', function () { pm.response.to.have.status(409); });", "pm.test('returns the assignment-conflict error', function () { pm.expect(pm.response.json().error).to.eql('Skill is already assigned to user'); });"] } }],
+          "request": { "method": "POST", "header": [], "url": "{{baseUrl}}/users/{{userId}}/skills/{{skillId}}" }
+        },
+        {
+          "name": "Remove skill assignment - 204",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 204 No Content', function () { pm.response.to.have.status(204); });", "pm.test('returns no response body', function () { pm.expect(pm.response.text()).to.eql(''); });"] } }],
+          "request": { "method": "DELETE", "header": [], "url": "{{baseUrl}}/users/{{userId}}/skills/{{skillId}}" }
+        },
+        {
+          "name": "Get user after skill removal - 200",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 200 OK', function () { pm.response.to.have.status(200); });", "pm.test('does not include the removed skill', function () { const skills = pm.response.json().skills; pm.expect(skills.some(function (skill) { return skill.id === Number(pm.environment.get('skillId')); })).to.eql(false); });"] } }],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/users/{{userId}}" }
+        },
+        {
+          "name": "Remove skill assignment again - 404",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 404 for a removed assignment', function () { pm.response.to.have.status(404); });", "pm.test('returns the assignment-not-found error', function () { pm.expect(pm.response.json().error).to.eql('Skill assignment not found'); });"] } }],
+          "request": { "method": "DELETE", "header": [], "url": "{{baseUrl}}/users/{{userId}}/skills/{{skillId}}" }
+        },
+        {
+          "name": "Remove missing skill assignment - 404",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 404 for an unknown assignment', function () { pm.response.to.have.status(404); });", "pm.test('returns the assignment-not-found error', function () { pm.expect(pm.response.json().error).to.eql('Skill assignment not found'); });"] } }],
+          "request": { "method": "DELETE", "header": [], "url": "{{baseUrl}}/users/{{userId}}/skills/{{missingSkillId}}" }
+        }
+      ]
+    },
+    {
+      "name": "Posts",
+      "item": [
+        {
+          "name": "Create post - 201",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 201 Created', function () { pm.response.to.have.status(201); });", "const body = pm.response.json();", "pm.test('returns the post linked to the user', function () { pm.expect(body).to.include({ title: pm.environment.get('postTitle'), content: 'Post body', user_id: Number(pm.environment.get('userId')) }); });", "pm.environment.set('postId', body.id);"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"title\": \"{{postTitle}}\",\n  \"content\": \"Post body\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/users/{{userId}}/posts" }
+        },
+        {
+          "name": "Create post - validation error 400",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 400 for a missing content', function () { pm.response.to.have.status(400); });", "pm.test('returns a validation error body', function () { pm.expect(pm.response.json().error).to.eql(\"'content' must be a non-empty string\"); });"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"title\": \"Missing content\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/users/{{userId}}/posts" }
+        },
+        {
+          "name": "Create post for missing user - 404",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 404 for an unknown author', function () { pm.response.to.have.status(404); });", "pm.test('returns the user-not-found error', function () { pm.expect(pm.response.json().error).to.eql('User not found'); });"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"title\": \"Orphan\",\n  \"content\": \"No author\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/users/{{missingUserId}}/posts" }
+        },
+        {
+          "name": "Get post - 200",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 200 OK', function () { pm.response.to.have.status(200); });", "pm.test('returns the requested post', function () { pm.expect(pm.response.json().id).to.eql(Number(pm.environment.get('postId'))); });"] } }],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/posts/{{postId}}" }
+        },
+        {
+          "name": "List posts - 200",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 200 OK', function () { pm.response.to.have.status(200); });", "pm.test('includes the created post', function () { pm.expect(pm.response.json().some(function (post) { return post.id === Number(pm.environment.get('postId')); })).to.eql(true); });"] } }],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/posts" }
+        },
+        {
+          "name": "Update post - 200",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 200 OK', function () { pm.response.to.have.status(200); });", "pm.test('updates only the supplied content', function () { const body = pm.response.json(); pm.expect(body.content).to.eql('Updated post body'); pm.expect(body.title).to.eql(pm.environment.get('postTitle')); });"] } }],
+          "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"content\": \"Updated post body\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/posts/{{postId}}" }
+        },
+        {
+          "name": "Update post - validation error 400",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 400 for an empty update', function () { pm.response.to.have.status(400); });", "pm.test('returns the update validation error', function () { pm.expect(pm.response.json().error).to.eql('At least one updatable field is required'); });"] } }],
+          "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/posts/{{postId}}" }
+        },
+        {
+          "name": "Update missing post - 404",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 404 for an unknown post', function () { pm.response.to.have.status(404); });", "pm.test('returns the post-not-found error', function () { pm.expect(pm.response.json().error).to.eql('Post not found'); });"] } }],
+          "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"content\": \"Unknown post\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/posts/{{missingPostId}}" }
+        },
+        {
+          "name": "Get missing post - 404",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 404 for an unknown post', function () { pm.response.to.have.status(404); });", "pm.test('returns the post-not-found error', function () { pm.expect(pm.response.json().error).to.eql('Post not found'); });"] } }],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/posts/{{missingPostId}}" }
+        },
+        {
+          "name": "Delete missing post - 404",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 404 for an unknown post', function () { pm.response.to.have.status(404); });", "pm.test('returns the post-not-found error', function () { pm.expect(pm.response.json().error).to.eql('Post not found'); });"] } }],
+          "request": { "method": "DELETE", "header": [], "url": "{{baseUrl}}/posts/{{missingPostId}}" }
+        },
+        {
+          "name": "Cleanup - delete post 204",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 204 No Content', function () { pm.response.to.have.status(204); });", "pm.test('returns no response body', function () { pm.expect(pm.response.text()).to.eql(''); });"] } }],
+          "request": { "method": "DELETE", "header": [], "url": "{{baseUrl}}/posts/{{postId}}" }
+        },
+        {
+          "name": "Get deleted post - 404",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 404 after deletion', function () { pm.response.to.have.status(404); });", "pm.test('returns the post-not-found error', function () { pm.expect(pm.response.json().error).to.eql('Post not found'); });"] } }],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/posts/{{postId}}" }
+        },
+        {
+          "name": "Cleanup - delete user 204",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 204 No Content', function () { pm.response.to.have.status(204); });", "pm.test('returns no response body', function () { pm.expect(pm.response.text()).to.eql(''); });"] } }],
+          "request": { "method": "DELETE", "header": [], "url": "{{baseUrl}}/users/{{userId}}" }
+        },
+        {
+          "name": "Cleanup - delete second user 204",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 204 No Content', function () { pm.response.to.have.status(204); });", "pm.test('returns no response body', function () { pm.expect(pm.response.text()).to.eql(''); });"] } }],
+          "request": { "method": "DELETE", "header": [], "url": "{{baseUrl}}/users/{{otherUserId}}" }
+        },
+        {
+          "name": "Get deleted user - 404",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('returns 404 after cleanup', function () { pm.response.to.have.status(404); });", "pm.test('returns the user-not-found error', function () { pm.expect(pm.response.json().error).to.eql('User not found'); });"] } }],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/users/{{userId}}" }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:5000" }
+  ]
+}
